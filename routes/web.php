@@ -20,7 +20,11 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::prefix('/api')->group(function () {
+Route::get('', function () {
+  return 'OK';
+});
+
+Route::prefix('/api')->middleware('authentication')->group(function () {
   Route::get('/healthcheck', function () {
     return 'OK';
   });
