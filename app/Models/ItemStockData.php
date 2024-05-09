@@ -6,11 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class ItemStockData extends Model
 {
-    protected $table = 'item_stock_data';
+  protected $table = 'item_stock_data';
 
-    protected $fillable = [
-        'item_meta_id',
-        'location_id',
-        'quantity',
-    ];
+  protected $fillable = [
+      'item_meta_id',
+      'location_id',
+      'quantity',
+  ];
+
+  public function item_meta() {
+    return $this->belongsTo(ItemMeta::class, 'item_meta_id', 'id');
+  }
 }

@@ -69,21 +69,29 @@ Route::prefix('/api')->group(function () {
   });
 
   Route::prefix('/inventory')->controller(InventoryController::class)->group(function () {
-    Route::get('/items');
+    Route::get('', 'getInventory');
+
+    Route::get('/items', 'getItems');
     Route::get('/item/{id}');
-    Route::post('/item');
+    Route::post('/item', 'createItemMeta');
     Route::put('/item/{id}');
     Route::delete('/item/{id}');
 
-    Route::get('/locations');
+    Route::get('/brands', 'getBrand');
+    Route::get('/categories', 'getCategory');
+    Route::post('/brand', 'createBrand');
+    Route::post('category', 'createCategory');
+
+    Route::get('/locations', 'getLocations');
     Route::get('/location/{id}');
+    Route::get('location/{location_id}/items', 'getStocksOnLocation');
     Route::post('/location', 'createItemLocation');
     Route::put('/location/{id}');
     Route::delete('/location/{id}');
 
-    Route::post('/stock-in');
+    Route::post('/stock-in', 'stockIn');
     Route::post('/stock-split');
-    Route::post('/stock-transfer');
+    Route::post('/stock-transfer', 'stockTransfer');
   });
 
   Route::prefix('/customer')->controller(CustomerController::class)->group(function () {
