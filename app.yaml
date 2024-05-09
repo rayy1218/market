@@ -2,7 +2,7 @@ runtime: php
 env: flex
 
 runtime_config:
-  - document_root: public
+  document_root: public
 
 automatic_scaling:
   min_num_instances: 1
