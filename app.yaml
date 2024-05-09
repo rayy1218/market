@@ -2,8 +2,6 @@ runtime: php81
 env: flex
 
 runtime_config:
-  operating_system: "ubuntu22"
-  runtime_version: "8.3"
   document_root: public
 
 automatic_scaling:
