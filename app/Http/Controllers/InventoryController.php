@@ -271,7 +271,7 @@ class InventoryController extends Controller
       ]);
     }
 
-    $data = $location->stocks;
+    $data = $location->stocks->load('item_meta');
 
     return ResponseHelper::success([
       'data' => $data,
@@ -294,7 +294,7 @@ class InventoryController extends Controller
         ]);
       }
 
-      if ($item_stock_data < $quantity) {
+      if ($item_stock_data->quantity < $quantity) {
         return ResponseHelper::rejected([
           'message' => 'FAILED_INSUFFICIENT_STOCK',
         ]);
@@ -334,7 +334,7 @@ class InventoryController extends Controller
     catch (\Exception $exception) {
       DB::rollBack();
       return ResponseHelper::error([
-        'error_message' => $exception->getMessage(),
+        'error_message' => $exception->getMessage() . $exception->getLine(),
       ]);
     }
   }
