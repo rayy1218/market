@@ -338,4 +338,121 @@ class InventoryController extends Controller
       ]);
     }
   }
+
+  public function getItem(Request $request, $id) {
+    $company_id = $request->requestFrom->company_id;
+
+    $item = ItemMeta::of($company_id)->with(['stocks', 'stocks.stock_location', 'brand', 'category'])->where('id', $id)->first();
+    if (!$item) {
+      return ResponseHelper::rejected([
+        'message' => 'FAILED_RECORD_NOT_FOUND',
+      ]);
+    }
+
+    return ResponseHelper::success([
+      'data' => $item,
+    ]);
+  }
+
+  public function editItem(Request $request, $id) {
+    $company_id = $request->requestFrom->company_id;
+    $name = $request->input('name');
+    $upc = $request->input('upc');
+    $sku = $request->input('sku');
+    $brand_id = $request->input('brand');
+    $category_id = $request->input('category');
+
+    $item = ItemMeta::of($company_id)->where('id', $id)->first();
+    if (!$item) {
+      return ResponseHelper::rejected([
+        'message' => 'FAILED_RECORD_NOT_FOUND',
+      ]);
+    }
+
+    $unique_field = [
+      'name' => $name,
+      'stock_keeping_unit' => $sku,
+      'universal_product_code' => $upc,
+    ];
+    foreach ($unique_field as $field => $value) {
+      if (ItemMeta::of($company_id)->where($field, $value)->first() && $item[$field] != $value) {
+        return ResponseHelper::rejected([
+          'message' => 'FAILED_RECORD_EXISTED',
+        ]);
+      }
+    }
+
+    try {
+      DB::beginTransaction();
+
+      $item->update([
+        'name' => $name,
+        'stock_keeping_unit' => $sku,
+        'universal_product_code' => $upc,
+        'brand' => $brand_id,
+        'category' => $category_id,
+      ]);
+
+      DB::commit();
+      return ResponseHelper::success();
+    }
+    catch (\Exception $exception) {
+      DB::rollBack();
+      return ResponseHelper::error([
+        'error_message' => $exception->getMessage() . $exception->getLine(),
+      ]);
+    }
+  }
+
+  public function stockSplit(Request $request) {
+    $company_id = $request->requestFrom->company_id;
+    $item_stock_data_id = $request->input('item_stock_data');
+    $quantity = $request->input('quantity');
+    $location_id = $request->input('output_location');
+    $output_item_id = $request->input('output_item');
+    $output_quantity = $request->input('output_quantity');
+
+    $item_stock = ItemStockData::where('id', $item_stock_data_id)->first();
+    if (!$item_stock) {
+      return ResponseHelper::rejected([
+        'message' => 'FAILED_RECORD_NOT_FOUND1',
+      ]);
+    }
+
+    $location = StockLocation::of($company_id)->where('id', $location_id)->first();
+    if (!$location) {
+      return ResponseHelper::rejected([
+        'message' => 'FAILED_RECORD_NOT_FOUND2',
+      ]);
+    }
+
+    $output_item = ItemMeta::of($company_id)->where('id', $output_item_id)->first();
+    if (!$output_item) {
+      return ResponseHelper::rejected([
+        'message' => 'FAILED_RECORD_NOT_FOUND3',
+      ]);
+    }
+
+    if ($item_stock->quantity < $quantity) {
+      return ResponseHelper::rejected([
+        'message' => 'FAILED_INSUFFICIENT_STOCK',
+      ]);
+    }
+
+    try {
+      DB::beginTransaction();
+
+      $item_stock->stock_location->stockOut($item_stock->item_meta_id, $quantity);
+      $location->stockIn($output_item->id, $quantity * $output_quantity);
+
+      DB::commit();
+      return ResponseHelper::success();
+    }
+    catch (\Exception $e) {
+      DB::rollBack();
+      return ResponseHelper::error([
+        'error_message' => $e->getMessage(),
+      ]);
+    }
+  }
 }

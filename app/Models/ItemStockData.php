@@ -17,4 +17,8 @@ class ItemStockData extends Model
   public function item_meta() {
     return $this->belongsTo(ItemMeta::class, 'item_meta_id', 'id');
   }
+
+  public function stock_location() {
+    return $this->belongsTo(StockLocation::class, 'location_id', 'id');
+  }
 }

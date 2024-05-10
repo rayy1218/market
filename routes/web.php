@@ -76,9 +76,9 @@ Route::prefix('/api')->middleware('authentication')->group(function () {
     Route::get('', 'getInventory');
 
     Route::get('/items', 'getItems');
-    Route::get('/item/{id}');
+    Route::get('/item/{id}', 'getItem');
     Route::post('/item', 'createItemMeta');
-    Route::put('/item/{id}');
+    Route::put('/item/{id}', 'editItem');
     Route::delete('/item/{id}');
 
     Route::get('/brands', 'getBrand');
@@ -94,7 +94,7 @@ Route::prefix('/api')->middleware('authentication')->group(function () {
     Route::delete('/location/{id}');
 
     Route::post('/stock-in', 'stockIn');
-    Route::post('/stock-split');
+    Route::post('/stock-split', 'stockSplit');
     Route::post('/stock-transfer', 'stockTransfer');
   });
 

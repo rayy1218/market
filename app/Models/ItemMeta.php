@@ -29,4 +29,12 @@ class ItemMeta extends Model
     public function stocks() {
       return $this->hasMany(ItemStockData::class, 'item_meta_id', 'id');
     }
+
+    public function brand() {
+      return $this->belongsTo(Brand::class, 'brand', 'id');
+    }
+
+    public function category() {
+      return $this->belongsTo(Category::class, 'category', 'id');
+    }
 }
