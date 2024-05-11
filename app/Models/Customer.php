@@ -14,4 +14,8 @@ class Customer extends Model
         'email',
         'phone_number',
     ];
+
+    public static function of($company_id) {
+      return self::where('company_id', $company_id);
+    }
 }

@@ -37,4 +37,8 @@ class ItemMeta extends Model
     public function category() {
       return $this->belongsTo(Category::class, 'category', 'id');
     }
+
+    public function sources() {
+      return $this->hasMany(ItemSource::class, 'item_meta_id', 'id');
+    }
 }

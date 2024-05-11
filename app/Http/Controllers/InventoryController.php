@@ -15,158 +15,152 @@ use Illuminate\Support\Facades\DB;
 
 class InventoryController extends Controller
 {
-    public function index()
-    {
+  public function createItemMeta(Request $request) {
+    $company_id = $request->requestFrom->company_id;
 
-    }
+    $name = $request->input('name');
+    $sku = $request->input('sku');
+    $upc = $request->input('upc');
+    $brand = $request->input('brand');
+    $category = $request->input('category');
+    $price = $request->input('price');
 
-    public function createItemMeta(Request $request) {
+    DB::beginTransaction();
 
-      $name = $request->input('name');
-      $sku = $request->input('sku');
-      $upc = $request->input('upc');
-      $brand = $request->input('brand');
-      $category = $request->input('category');
-      $price = $request->input('price');
+    try {
+      $itemMeta = ItemMeta::create([
+        'name' => $name,
+        'company_id' => $company_id,
+        'stock_keeping_unit' => $sku,
+        'universal_product_code' => $upc,
+        'brand' => $brand,
+        'category' => $category,
+      ]);
 
-      DB::beginTransaction();
-
-      try {
-        $company_id = $request->requestFrom->company_id;
-
-        $itemMeta = ItemMeta::create([
-          'name' => $name,
-          'company_id' => $company_id,
-          'stock_keeping_unit' => $sku,
-          'universal_product_code' => $upc,
-          'brand' => $brand,
-          'category' => $category,
-        ]);
-
-        if ($price) {
-          ItemSaleData::create([
-            'item_meta_id' => $itemMeta->id,
-            'price' => $price,
-            'started_at' => Carbon::now(),
-          ]);
-        }
-
-        DB::commit();
-
-        return ResponseHelper::success();
-      }
-      catch (\Exception $e) {
-        DB::rollBack();
-        return ResponseHelper::error([
-          'error_message' => $e->getMessage(),
+      if ($price) {
+        ItemSaleData::create([
+          'item_meta_id' => $itemMeta->id,
+          'price' => $price,
+          'started_at' => Carbon::now(),
         ]);
       }
+
+      DB::commit();
+
+      return ResponseHelper::success();
+    }
+    catch (\Exception $e) {
+      DB::rollBack();
+      return ResponseHelper::error([
+        'error_message' => $e->getMessage(),
+      ]);
+    }
+  }
+
+  public function createBrand(Request $request) {
+    $company_id = $request->requestFrom->company_id;
+    $name = $request->input('name');
+
+    if (Brand::where('company_id', $company_id)->where('name', 'name')->first()) {
+      return ResponseHelper::rejected([
+        'message' => 'FAILED_RECORD_EXISTED',
+      ]);
     }
 
-    public function createBrand(Request $request) {
-      $company_id = $request->requestFrom->company_id;
-      $name = $request->input('name');
+    $brand = Brand::create([
+      'company_id' => $company_id,
+      'name' => $name,
+    ]);
 
-      if (Brand::where('company_id', $company_id)->where('name', 'name')->first()) {
+    return ResponseHelper::success([
+      'data' => $brand
+    ]);
+  }
+
+  public function getBrand(Request $request) {
+    $company_id = $request->requestFrom->company_id;
+
+    return ResponseHelper::success([
+      'data' => Brand::where('company_id', $company_id)->get(),
+    ]);
+  }
+
+  public function createCategory(Request $request) {
+    $company_id = $request->requestFrom->company_id;
+    $name = $request->input('name');
+
+    if (Category::where('company_id', $company_id)->where('name', 'name')->first()) {
+      return ResponseHelper::rejected([
+        'message' => 'FAILED_RECORD_EXISTED',
+      ]);
+    }
+
+    $category = Category::create([
+      'company_id' => $company_id,
+      'name' => $name,
+    ]);
+
+    return ResponseHelper::success([
+      'data' => $category,
+    ]);
+  }
+
+  public function getCategory(Request $request) {
+    $company_id = $request->requestFrom->company_id;
+
+    return ResponseHelper::success([
+      'data' => Category::where('company_id', $company_id)->get(),
+    ]);
+  }
+
+  public function createItemLocation(Request $request) {
+    $company_id = $request->requestFrom->company_id;
+
+    $name = $request->input('name');
+    $parent = $request->input('parent');
+
+    DB::beginTransaction();
+
+    try {
+      if (StockLocation::where('company_id', $company_id)->where('name', $name)->first()) {
         return ResponseHelper::rejected([
           'message' => 'FAILED_RECORD_EXISTED',
         ]);
       }
 
-      $brand = Brand::create([
+      StockLocation::create([
         'company_id' => $company_id,
+        'parent_id' => $parent,
         'name' => $name,
       ]);
 
-      return ResponseHelper::success([
-        'data' => $brand
+      DB::commit();
+
+      return ResponseHelper::success();
+    }
+    catch (\Exception $e) {
+      DB::rollBack();
+      return ResponseHelper::error([
+        'error_message' => $e->getMessage(),
       ]);
     }
+  }
 
-    public function getBrand(Request $request) {
-      $company_id = $request->requestFrom->company_id;
+  public function getItems(Request $request) {
+    $company_id = $request->requestFrom->company_id;
 
-      return ResponseHelper::success([
-        'data' => Brand::where('company_id', $company_id)->get(),
-      ]);
+    $records = ItemMeta::where('company_id', $company_id)->get();
+
+    foreach ($records as $record) {
+      $record['stock_count'] = $record->stocks->sum(function ($stock) {
+        return $stock->quantity;
+      });
     }
 
-    public function createCategory(Request $request) {
-      $company_id = $request->requestFrom->company_id;
-      $name = $request->input('name');
-
-      if (Category::where('company_id', $company_id)->where('name', 'name')->first()) {
-        return ResponseHelper::rejected([
-          'message' => 'FAILED_RECORD_EXISTED',
-        ]);
-      }
-
-      $category = Category::create([
-        'company_id' => $company_id,
-        'name' => $name,
-      ]);
-
-      return ResponseHelper::success([
-        'data' => $category,
-      ]);
-    }
-
-    public function getCategory(Request $request) {
-      $company_id = $request->requestFrom->company_id;
-
-      return ResponseHelper::success([
-        'data' => Category::where('company_id', $company_id)->get(),
-      ]);
-    }
-
-    public function createItemLocation(Request $request) {
-      $company_id = $request->requestFrom->company_id;
-
-      $name = $request->input('name');
-      $parent = $request->input('parent');
-
-      DB::beginTransaction();
-
-      try {
-        if (StockLocation::where('company_id', $company_id)->where('name', $name)->first()) {
-          return ResponseHelper::rejected([
-            'message' => 'FAILED_RECORD_EXISTED',
-          ]);
-        }
-
-        StockLocation::create([
-          'company_id' => $company_id,
-          'parent_id' => $parent,
-          'name' => $name,
-        ]);
-
-        DB::commit();
-
-        return ResponseHelper::success();
-      }
-      catch (\Exception $e) {
-        DB::rollBack();
-        return ResponseHelper::error([
-          'error_message' => $e->getMessage(),
-        ]);
-      }
-    }
-
-    public function getItems(Request $request) {
-      $company_id = $request->requestFrom->company_id;
-
-      $records = ItemMeta::where('company_id', $company_id)->get();
-
-      foreach ($records as $record) {
-        $record['stock_count'] = $record->stocks->sum(function ($stock) {
-          return $stock->quantity;
-        });
-      }
-
-      return ResponseHelper::success([
-        'data' => $records,
-      ]);
-    }
+    return ResponseHelper::success([
+      'data' => $records,
+    ]);
+  }
 
   protected function recursiveGetChildren($locations) {
     foreach ($locations as $location) {
@@ -342,7 +336,9 @@ class InventoryController extends Controller
   public function getItem(Request $request, $id) {
     $company_id = $request->requestFrom->company_id;
 
-    $item = ItemMeta::of($company_id)->with(['stocks', 'stocks.stock_location', 'brand', 'category'])->where('id', $id)->first();
+    $item = ItemMeta::of($company_id)->with([
+      'stocks', 'stocks.stock_location', 'brand', 'category', 'sources', 'sources.supplier'
+    ])->where('id', $id)->first();
     if (!$item) {
       return ResponseHelper::rejected([
         'message' => 'FAILED_RECORD_NOT_FOUND',
@@ -415,21 +411,21 @@ class InventoryController extends Controller
     $item_stock = ItemStockData::where('id', $item_stock_data_id)->first();
     if (!$item_stock) {
       return ResponseHelper::rejected([
-        'message' => 'FAILED_RECORD_NOT_FOUND1',
+        'message' => 'FAILED_RECORD_NOT_FOUND',
       ]);
     }
 
     $location = StockLocation::of($company_id)->where('id', $location_id)->first();
     if (!$location) {
       return ResponseHelper::rejected([
-        'message' => 'FAILED_RECORD_NOT_FOUND2',
+        'message' => 'FAILED_RECORD_NOT_FOUND',
       ]);
     }
 
     $output_item = ItemMeta::of($company_id)->where('id', $output_item_id)->first();
     if (!$output_item) {
       return ResponseHelper::rejected([
-        'message' => 'FAILED_RECORD_NOT_FOUND3',
+        'message' => 'FAILED_RECORD_NOT_FOUND',
       ]);
     }
 

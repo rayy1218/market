@@ -13,4 +13,8 @@ class OrderItem extends Model
         'item_source_id',
         'quantity',
     ];
+
+    public function item_source() {
+      return $this->belongsTo(ItemSource::class, 'item_source_id', 'id');
+    }
 }

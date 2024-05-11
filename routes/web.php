@@ -60,16 +60,19 @@ Route::prefix('/api')->middleware('authentication')->group(function () {
   });
 
   Route::prefix('/supply')->controller(SupplyChainController::class)->group(function () {
-    Route::get('/orders');
-    Route::get('/order/{id}');
-    Route::post('/order');
-    Route::put('/order/{id}');
+    Route::get('/orders', 'getOrders');
+    Route::get('/order/{id}', 'getOrder');
+    Route::post('/order', 'createOrder');
+    Route::put('/order/{id}', 'updateOrder');
 
-    Route::get('/suppliers');
-    Route::get('/supplier/{id}');
-    Route::post('/supplier');
-    Route::put('/supplier/{id}');
+    Route::get('/suppliers', 'getSuppliers');
+    Route::get('/supplier/{id}', 'getSupplier');
+    Route::post('/supplier', 'createSupplier');
+    Route::put('/supplier/{id}', 'updateSupplier');
     Route::delete('/supplier/{id}');
+
+    Route::post('/source', 'createItemSource');
+    Route::put('/source/{id}', 'updateItemSource');
   });
 
   Route::prefix('/inventory')->controller(InventoryController::class)->group(function () {
@@ -99,11 +102,11 @@ Route::prefix('/api')->middleware('authentication')->group(function () {
   });
 
   Route::prefix('/customer')->controller(CustomerController::class)->group(function () {
-    Route::get('/entries');
-    Route::get('/entry/{id}');
-    Route::post('/entry');
-    Route::put('/entry/{id}');
-    Route::delete('/entry/{id}');
+    Route::get('/entries', 'getCustomers');
+    Route::get('/entry/{id}', 'getCustomer');
+    Route::post('/entry', 'createCustomer');
+    Route::put('/entry/{id}', 'updateCustomer');
+    Route::delete('/entry/{id}', 'deleteCustomer');
   });
 
   Route::prefix('/checkout')->controller(CheckoutController::class)->group(function () {

@@ -15,4 +15,12 @@ class ItemSource extends Model
         'min_order_quantity',
         'estimated_lead_time_day',
     ];
+
+    public function item_meta() {
+      return $this->belongsTo(ItemMeta::class, 'item_meta_id', 'id');
+    }
+
+    public function supplier() {
+      return $this->belongsTo(Supplier::class, 'supplier_id', 'id');
+    }
 }
