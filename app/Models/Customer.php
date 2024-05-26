@@ -13,6 +13,7 @@ class Customer extends Model
         'name',
         'email',
         'phone_number',
+        'points',
     ];
 
     public static function of($company_id) {

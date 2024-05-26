@@ -5,6 +5,7 @@ use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ManagerialController;
+use App\Http\Controllers\ReportingController;
 use App\Http\Controllers\ScheduleController;
 use App\Http\Controllers\SupplyChainController;
 use Illuminate\Support\Facades\Route;
@@ -54,9 +55,9 @@ Route::prefix('/api')->middleware('authentication')->group(function () {
   });
 
   Route::prefix('/schedule')->controller(ScheduleController::class)->group(function () {
-    Route::get('/entries', 'getTodayEntries');
+    Route::get('/entries', 'getTodayTimestamps');
     Route::get('/all-entries', 'getAllEntries');
-    Route::post('/entry', 'createEntry');
+    Route::post('/entry', 'addTimestamp');
   });
 
   Route::prefix('/supply')->controller(SupplyChainController::class)->group(function () {
@@ -73,6 +74,8 @@ Route::prefix('/api')->middleware('authentication')->group(function () {
 
     Route::post('/source', 'createItemSource');
     Route::put('/source/{id}', 'updateItemSource');
+
+    Route::post('/item/{id}', 'createItemSupply');
   });
 
   Route::prefix('/inventory')->controller(InventoryController::class)->group(function () {
@@ -110,7 +113,20 @@ Route::prefix('/api')->middleware('authentication')->group(function () {
   });
 
   Route::prefix('/checkout')->controller(CheckoutController::class)->group(function () {
-    Route::post('/initial');
+    Route::post('/create', 'checkout');
+  });
+
+  Route::prefix('/report')->controller(ReportingController::class)->group(function () {
+    Route::post('/under-stock', 'underStock');
+    Route::post('/shift-today', 'shiftToday');
+    Route::post('/delivering-order', 'deliveringOrder');
+    Route::post('/inventory-stock-flow-summary', 'inventoryStockFlowSummary');
+    Route::post('/inventory-finance-summary', 'inventoryFinanceSummary');
+    Route::post('/most-sale-items', 'mostSalesItem');
+    Route::post('/most-productive-items', 'mostProductiveItem');
+    Route::post('/approaching-under-stock', 'approachingUnderStock');
+    Route::post('/top-supplier', 'topSupplier');
+    Route::post('/order-summary', 'orderSummary');
   });
 });
 

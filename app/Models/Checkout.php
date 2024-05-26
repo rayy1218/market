@@ -13,12 +13,18 @@ class Checkout extends Model
         'customer_id',
         'user_id',
         'amount',
-        'timestamp',
-        'status',
         'payment_method',
     ];
 
     protected $casts = [
         'timestamp' => 'datetime',
     ];
+
+    public static function of($company_id) {
+      return self::where('company_id', $company_id);
+    }
+
+    public function items($company_id) {
+      return $this->hasMany(CheckoutItem::class, 'checkout_id', 'id');
+    }
 }

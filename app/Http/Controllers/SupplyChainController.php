@@ -6,6 +6,7 @@ use App\Helper\ResponseHelper;
 use App\Models\Address;
 use App\Models\ItemMeta;
 use App\Models\ItemSource;
+use App\Models\ItemSupplyData;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Supplier;
@@ -299,5 +300,61 @@ class SupplyChainController extends Controller
       'new_status' => $order->status,
       'timestamp' => $order->updated_at,
     ]);
+  }
+
+  public function createItemSupply(Request $request, $id) {
+    $company_id = $request->requestFrom->company_id;
+
+    $request_data = $request->validate([
+      'item_source_id' => ['required', 'int'],
+      'on_low_stock_action' => ['required', 'string', 'in:email,notify,show,hidden'],
+      'default_restock_quantity' => ['required', 'int'],
+      'restock_point' => ['required', 'int'],
+    ]);
+
+    $item = ItemMeta::of($company_id)->where('id', $id)->first();
+    if (!$item)
+      return ResponseHelper::rejected([
+        'message' => 'FAILED_RECORD_NOT_FOUND',
+      ]);
+
+    $item_source = ItemSource::where('id', $request->input('item_source_id'));
+    if (!$item_source)
+      return ResponseHelper::rejected([
+        'message' => 'FAILED_RECORD_NOT_FOUND',
+      ]);
+
+
+    try {
+      DB::beginTransaction();
+
+      $supply_data = $item->supply_data;
+      if ($supply_data) {
+        $supply_data->update([
+          'item_source_id' => $request_data['item_source_id'],
+          'on_low_stock_action' => $request_data['on_low_stock_action'],
+          'default_restock_quantity' => $request_data['default_restock_quantity'],
+          'restock_point' => $request_data['restock_point'],
+        ]);
+      }
+      else {
+        ItemSupplyData::create([
+          'item_meta_id' => $item->id,
+          'item_source_id' => $request_data['item_source_id'],
+          'on_low_stock_action' => $request_data['on_low_stock_action'],
+          'default_restock_quantity' => $request_data['default_restock_quantity'],
+          'restock_point' => $request_data['restock_point'],
+        ]);
+      }
+
+      DB::commit();
+      return ResponseHelper::success();
+    }
+    catch (Exception $e) {
+      DB::rollBack();
+      return ResponseHelper::error([
+        'error_message' => $e->getMessage() . ' ' . $e->getLine() . $e->getCode() . $e->getFile(),
+      ]);
+    }
   }
 }

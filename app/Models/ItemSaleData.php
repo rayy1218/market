@@ -17,4 +17,8 @@ class ItemSaleData extends Model
     protected $casts = [
         'started_at' => 'datetime',
     ];
+
+    public function item_meta() {
+      return $this->belongsTo(ItemMeta::class, 'item_meta_id', 'id');
+    }
 }

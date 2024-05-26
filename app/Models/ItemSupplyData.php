@@ -15,4 +15,8 @@ class ItemSupplyData extends Model
         'default_restock_quantity',
         'restock_point',
     ];
+
+    public function source() {
+      return $this->belongsTo(ItemSource::class, 'item_source_id', 'id');
+    }
 }

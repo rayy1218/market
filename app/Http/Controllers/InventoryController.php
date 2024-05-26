@@ -37,13 +37,11 @@ class InventoryController extends Controller
         'category' => $category,
       ]);
 
-      if ($price) {
-        ItemSaleData::create([
-          'item_meta_id' => $itemMeta->id,
-          'price' => $price,
-          'started_at' => Carbon::now(),
-        ]);
-      }
+      ItemSaleData::create([
+        'item_meta_id' => $itemMeta->id,
+        'price' => $price ?? 0,
+        'started_at' => Carbon::now(),
+      ]);
 
       DB::commit();
 
@@ -337,7 +335,7 @@ class InventoryController extends Controller
     $company_id = $request->requestFrom->company_id;
 
     $item = ItemMeta::of($company_id)->with([
-      'stocks', 'stocks.stock_location', 'brand', 'category', 'sources', 'sources.supplier'
+      'stocks', 'stocks.stock_location', 'brand', 'category', 'sources', 'sources.supplier', 'supply_data'
     ])->where('id', $id)->first();
     if (!$item) {
       return ResponseHelper::rejected([

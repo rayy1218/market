@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 class ItemMeta extends Model
 {
@@ -26,6 +27,28 @@ class ItemMeta extends Model
       return self::where('company_id', $company_id);
     }
 
+    public function stockOutRate() {
+      // calculate rate based on last week, last month and last year
+      $now = Carbon::now();
+      $query = CheckoutItem::with(['sale_data', 'sale_data.item_meta'])
+        ->where('sale_date.item_meta.id', $this->id);
+      $last_week_consumption = $query
+        ->whereBetween('created_at', [$now->subWeek()->startOfDay(), $now])
+        ->select(['id', 'SUM(quantity) AS total'])->get();
+      $last_month_consumption = $query
+        ->whereBetween('created_at', [$now->subMonth()->startOfDay(), $now])
+        ->select(['id', 'SUM(quantity) AS total'])->get();
+      $last_year_consumption = $query
+        ->whereBetween('created_at', [$now->subYear()->startOfDay(), $now])
+        ->select(['id', 'SUM(quantity) AS total'])->get();
+
+      return [
+        'week' => $last_week_consumption->total / 7,
+        'month' => $last_month_consumption->total / 30,
+        'year' => $last_year_consumption->total / 365,
+      ];
+    }
+
     public function stocks() {
       return $this->hasMany(ItemStockData::class, 'item_meta_id', 'id');
     }
@@ -40,5 +63,13 @@ class ItemMeta extends Model
 
     public function sources() {
       return $this->hasMany(ItemSource::class, 'item_meta_id', 'id');
+    }
+
+    public function sale_data() {
+      return $this->hasOne(ItemSaleData::class, 'item_meta_id', 'id')->latest('started_at');
+    }
+
+    public function supply_data() {
+      return $this->hasOne(ItemSupplyData::class, 'item_meta_id', 'id');
     }
 }

@@ -14,4 +14,12 @@ class CheckoutItem extends Model
         'item_sale_data_id',
         'quantity',
     ];
+
+    public function sale_data() {
+      return $this->belongsTo(ItemSaleData::class, 'item_sale_data_id', 'id');
+    }
+
+    public function checkout() {
+      return $this->belongsTo(Checkout::class, 'checkout_id', 'id');
+    }
 }
