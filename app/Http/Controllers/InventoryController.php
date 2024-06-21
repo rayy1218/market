@@ -24,10 +24,17 @@ class InventoryController extends Controller
     $brand = $request->input('brand');
     $category = $request->input('category');
     $price = $request->input('price');
+    $stock_out_location = $request->input('stock_out_location');
 
     DB::beginTransaction();
 
     try {
+      if ($stock_out_location)
+        if (!StockLocation::of($company_id)->where('id', $stock_out_location)->first())
+          return ResponseHelper::rejected([
+            'message' => 'FAILED_RECORD_NOT_FOUND',
+          ]);
+
       $itemMeta = ItemMeta::create([
         'name' => $name,
         'company_id' => $company_id,
@@ -41,6 +48,7 @@ class InventoryController extends Controller
         'item_meta_id' => $itemMeta->id,
         'price' => $price ?? 0,
         'started_at' => Carbon::now(),
+        'default_stock_out_location_id' => $stock_out_location ?? StockLocation::of($company_id)->first()->id,
       ]);
 
       DB::commit();
@@ -147,7 +155,7 @@ class InventoryController extends Controller
   public function getItems(Request $request) {
     $company_id = $request->requestFrom->company_id;
 
-    $records = ItemMeta::where('company_id', $company_id)->get();
+    $records = ItemMeta::with(['brand', 'category', 'sale_data'])->where('company_id', $company_id)->get();
 
     foreach ($records as $record) {
       $record['stock_count'] = $record->stocks->sum(function ($stock) {
@@ -225,22 +233,7 @@ class InventoryController extends Controller
         ]);
       }
 
-      $item_stock_data = ItemStockData::where('location_id', $location_id)
-        ->where('item_meta_id', $item_meta_id)
-        ->first();
-
-      if ($item_stock_data) {
-        $item_stock_data->update([
-          'quantity' => $item_stock_data->quantity + $quantity,
-        ]);
-      }
-      else {
-        ItemStockData::create([
-          'location_id' => $location_id,
-          'item_meta_id' => $item_meta_id,
-          'quantity' => $quantity,
-        ]);
-      }
+      $location->stockIn($request->requestFrom, $item_meta_id, $quantity);
 
       DB::commit();
       return ResponseHelper::success();
@@ -299,26 +292,7 @@ class InventoryController extends Controller
         ]);
       }
 
-      $new_item_stock_data = ItemStockData::where('location_id', $new_location_id)
-        ->where('item_meta_id', $item_stock_data->item_meta_id)
-        ->first();
-
-      if ($new_item_stock_data) {
-        $new_item_stock_data->update([
-          'quantity' => $new_item_stock_data->quantity + $quantity,
-        ]);
-      }
-      else {
-        ItemStockData::create([
-          'location_id' => $new_location_id,
-          'item_meta_id' => $item_stock_data->item_meta_id,
-          'quantity' => $quantity,
-        ]);
-      }
-
-      $item_stock_data->update([
-        'quantity' => $item_stock_data->quantity - $quantity,
-      ]);
+      $item_stock_data->stock_location->transferTo($request->requestFrom, $new_location_id, $item_stock_data->item_meta_id, $quantity);
 
       DB::commit();
       return ResponseHelper::success();
@@ -335,7 +309,18 @@ class InventoryController extends Controller
     $company_id = $request->requestFrom->company_id;
 
     $item = ItemMeta::of($company_id)->with([
-      'stocks', 'stocks.stock_location', 'brand', 'category', 'sources', 'sources.supplier', 'supply_data'
+      'stocks',
+      'stocks.stock_location',
+      'brand',
+      'category',
+      'sources',
+      'sources.supplier',
+      'supply_data',
+      'sale_data',
+      'sale_data.default_stock_out_location',
+      'sale_data.checkout_items',
+      'sale_data.checkout_items.checkout',
+      'sale_data.checkout_items.sale_data'
     ])->where('id', $id)->first();
     if (!$item) {
       return ResponseHelper::rejected([
@@ -355,6 +340,8 @@ class InventoryController extends Controller
     $sku = $request->input('sku');
     $brand_id = $request->input('brand');
     $category_id = $request->input('category');
+    $price = $request->input('price');
+    $location_id = $request->input('default_stock_location');
 
     $item = ItemMeta::of($company_id)->where('id', $id)->first();
     if (!$item) {
@@ -362,6 +349,12 @@ class InventoryController extends Controller
         'message' => 'FAILED_RECORD_NOT_FOUND',
       ]);
     }
+
+    if (!StockLocation::of($company_id)->where('id', $location_id)->first())
+      return ResponseHelper::rejected([
+        'data' => StockLocation::of($company_id)->where('id', $location_id)->first(),
+        'message' => 'FAILED_RECORD_NOT_FOUND',
+      ]);
 
     $unique_field = [
       'name' => $name,
@@ -385,6 +378,13 @@ class InventoryController extends Controller
         'universal_product_code' => $upc,
         'brand' => $brand_id,
         'category' => $category_id,
+      ]);
+
+      ItemSaleData::create([
+        'item_meta_id' => $item->id,
+        'price' => $price,
+        'default_stock_out_location_id' => $location_id,
+        'started_at' => Carbon::now(),
       ]);
 
       DB::commit();
@@ -436,8 +436,9 @@ class InventoryController extends Controller
     try {
       DB::beginTransaction();
 
-      $item_stock->stock_location->stockOut($item_stock->item_meta_id, $quantity);
-      $location->stockIn($output_item->id, $quantity * $output_quantity);
+      $item_stock->stock_location->splitTo(
+        $request->requestFrom, $item_stock->item_meta_id, $quantity, $output_item->id, $quantity * $output_quantity
+      );
 
       DB::commit();
       return ResponseHelper::success();

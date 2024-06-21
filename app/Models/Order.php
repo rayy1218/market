@@ -13,6 +13,7 @@ class Order extends Model
         'user_id',
         'status',
         'remark',
+        'reference_code',
     ];
 
     public const STATUS_CREATED = 'created';
@@ -35,5 +36,9 @@ class Order extends Model
 
     public function order_items() {
       return $this->hasMany(OrderItem::class, 'order_id', 'id');
+    }
+
+    public function user() {
+      return $this->belongsTo(User::class, 'user_id', 'id');
     }
 }

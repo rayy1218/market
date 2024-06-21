@@ -10,6 +10,8 @@ use App\Models\ItemStockData;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ShiftRecord;
+use App\Models\StockLocation;
+use App\Models\StockTransactionLog;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -100,10 +102,12 @@ class ReportingController extends Controller
     })->sum();
 
     return ResponseHelper::success([
-      'order_num' => $orders->count(),
-      'checkout_num' => $checkouts->count(),
-      'stock_in_num' => $stock_in_count,
-      'stock_out_num' => $stock_out_count,
+      'data' => [
+        'orderNum' => $orders->count(),
+        'checkoutNum' => $checkouts->count(),
+        'stockInNum' => $stock_in_count,
+        'stockOutNum' => $stock_out_count,
+      ],
     ]);
   }
 
@@ -128,22 +132,22 @@ class ReportingController extends Controller
       ->whereBetween('created_at', [$startDate, $endDate])
       ->get();
 
-    $income = $checkouts->reduce(function (Checkout $checkout) {
+    $income = $checkouts->map(function (Checkout $checkout) {
       return $checkout->items->reduce(function (CheckoutItem $item) {
         return ($item->sale_data ? $item->sale_data->price : 0) * $item->quantity;
       });
-    });
+    })->sum();
 
-    $cost = $orders->reduce(function (Order $order) {
-      return $order->order_items->reduce(function (OrderItem $item) {
+    $cost = $orders->map(function (Order $order) {
+      return $order->order_items->map(function (OrderItem $item) {
         return ($item->item_source ? $item->item_source->unit_price : 0) * $item->quantity;
-      });
-    });
+      })->sum();
+    })->sum();
 
     return ResponseHelper::success([
       'income' => $income,
       'cost' => $cost,
-      'totalCheckout' => $orders->count(),
+      'totalCheckout' => $checkouts->count(),
     ]);
   }
 
@@ -160,24 +164,11 @@ class ReportingController extends Controller
       $endDate = Carbon::now()->endOfMonth();
     }
 
-    $top = CheckoutItem::with(['checkout', 'sale_data'])
-      ->where('checkout.company_id', $company_id)
-      ->whereBetween('checkout.created_at', [$startDate, $endDate])
-      ->select([
-        'id', 'SUM(sale_data.price * quantity) AS total'
-      ])
-      ->groupBy('id')
-      ->orderByDesc('SUM(sale_data.price)')
-      ->limit(10)
+    $items = CheckoutItem::with(['checkout', 'sale_data'])
+      ->whereBetween('created_at', [$startDate, $endDate])
       ->get();
 
-    $items = CheckoutItem::with(['sale_data', 'sale_data.item_meta'])
-      ->whereIn('id', $top->pluck('id'))
-      ->get();
-
-    foreach ($items as $item) {
-      $item->total = $top->where('id', $item->id)->first->total;
-    }
+    $items = $items->groupBy('sale_data.item_meta_id');
 
     return ResponseHelper::success([
       'data' => $items,
@@ -201,10 +192,10 @@ class ReportingController extends Controller
       ->where('checkout.company_id', $company_id)
       ->whereBetween('checkout.created_at', [$startDate, $endDate])
       ->select([
-        'id', 'SUM(quantity) AS total'
+        'id', "SUM('quantity') AS total"
       ])
       ->groupBy('id')
-      ->orderByDesc('SUM(quantity)')
+      ->orderByDesc("SUM('quantity')")
       ->limit(10)
       ->get();
 
@@ -310,12 +301,79 @@ class ReportingController extends Controller
       $endDate = Carbon::now()->endOfMonth();
     }
 
-    Supplier::of($company_id)->withCount((['orders' => function ($query) use ($startDate, $endDate) {
+    $suppliers = Supplier::of($company_id)->withCount((['orders' => function ($query) use ($startDate, $endDate) {
       $query->whereBetween('created_at', [$startDate, $endDate]);
     }]))->orderByDesc('orders_count')->limit(5)->get();
+
+    return ResponseHelper::success([
+      'data' => $suppliers,
+    ]);
+  }
+
+  public function stockFlowLog(Request $request) {
+    $company_id = $request->requestFrom->company_id;
+    $date = $request->input('date');
+
+    if ($date) {
+      $startDate = Carbon::parse($date)->startOfMonth();
+      $endDate = Carbon::parse($date)->endOfMonth();
+    }
+    else {
+      $startDate = Carbon::now()->startOfMonth();
+      $endDate = Carbon::now()->endOfMonth();
+    }
+
+    $logs = StockTransactionLog::of($company_id)
+      ->with(['user', 'stockInItem', 'stockOutItem', 'stockInLocation', 'stockOutItem', 'stockOutLocation', 'checkoutItem', 'checkoutItem.sale_data.item_meta', 'checkoutItem.checkout'])
+      ->whereBetween('created_at', [$startDate, $endDate])
+      ->orderByDesc('created_at')
+      ->get();
+
+    return ResponseHelper::success([
+      'data' => $logs
+    ]);
   }
 
   public function itemStockOutRate() {
 
+  }
+
+  public function stockLocationSummary(Request $request) {
+    $company_id = $request->requestFrom->company_id;
+    $stockLocationIds = StockLocation::of($company_id)->get()->pluck('id');
+
+    $invalid = ItemStockData::with(['stock_location', 'item_meta'])
+      ->whereIn('location_id', $stockLocationIds)
+      ->where('quantity', '<', 0)
+      ->get();
+
+    $await_restock = ItemStockData::with(['stock_location', 'item_meta'])
+      ->whereIn('location_id', $stockLocationIds)
+      ->where('quantity', 0)
+      ->get();
+
+    $stockLocations = StockLocation::of($company_id)
+      ->whereIn('id', array_merge(array_unique($invalid->pluck('location_id')->toArray()), array_unique($await_restock->pluck('location_id')->toArray())))
+      ->get();
+
+    return ResponseHelper::success([
+      'data' => [
+        'invalid' => $invalid,
+        'await_restock' => $await_restock,
+        'locations' => $stockLocations,
+      ]
+    ]);
+  }
+
+  public function deliveringOrders(Request $request) {
+    $company_id = $request->requestFrom->company_id;
+    $orders = Order::of($company_id)
+      ->with('supplier')
+      ->where('status', Order::STATUS_DELIVERING)
+      ->get();
+
+    return ResponseHelper::success([
+      'data' => $orders,
+    ]);
   }
 }

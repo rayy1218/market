@@ -76,6 +76,7 @@ Route::prefix('/api')->middleware('authentication')->group(function () {
     Route::put('/source/{id}', 'updateItemSource');
 
     Route::post('/item/{id}', 'createItemSupply');
+    Route::post('/order/stock-in/{id}', 'stockInByOrder');
   });
 
   Route::prefix('/inventory')->controller(InventoryController::class)->group(function () {
@@ -127,6 +128,9 @@ Route::prefix('/api')->middleware('authentication')->group(function () {
     Route::post('/approaching-under-stock', 'approachingUnderStock');
     Route::post('/top-supplier', 'topSupplier');
     Route::post('/order-summary', 'orderSummary');
+    Route::post('/stock-flow-log', 'stockFlowLog');
+    Route::post('/stock-location-summary', 'stockLocationSummary');
+    Route::post('/delivering-orders', 'deliveringOrders');
   });
 });
 

@@ -14,6 +14,7 @@ class Checkout extends Model
         'user_id',
         'amount',
         'payment_method',
+        'reference_code',
     ];
 
     protected $casts = [
@@ -24,7 +25,7 @@ class Checkout extends Model
       return self::where('company_id', $company_id);
     }
 
-    public function items($company_id) {
+    public function items() {
       return $this->hasMany(CheckoutItem::class, 'checkout_id', 'id');
     }
 }

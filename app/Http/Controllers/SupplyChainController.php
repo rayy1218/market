@@ -3,16 +3,21 @@
 namespace App\Http\Controllers;
 
 use App\Helper\ResponseHelper;
+use App\Mail\OrderMail;
 use App\Models\Address;
 use App\Models\ItemMeta;
 use App\Models\ItemSource;
 use App\Models\ItemSupplyData;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\StockLocation;
 use App\Models\Supplier;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class SupplyChainController extends Controller
 {
@@ -220,6 +225,7 @@ class SupplyChainController extends Controller
         'user_id' => $request->requestFrom->id,
         'status' => Order::STATUS_PENDING,
         'remark' => $remark ?? '',
+        'reference_code' => 'P-' . Carbon::now()->format('Ymd') . '-' . Str::random(10)
       ]);
 
       foreach ($order_items as $order_item) {
@@ -234,6 +240,10 @@ class SupplyChainController extends Controller
           'order_id' => $order->id,
           'quantity' => $order_item['quantity'],
         ]);
+      }
+
+      if ($send_mail) {
+        Mail::to($supplier->email)->send(new OrderMail($order));
       }
 
       DB::commit();
@@ -353,7 +363,41 @@ class SupplyChainController extends Controller
     catch (Exception $e) {
       DB::rollBack();
       return ResponseHelper::error([
-        'error_message' => $e->getMessage() . ' ' . $e->getLine() . $e->getCode() . $e->getFile(),
+        'error_message' => $e->getMessage(),
+      ]);
+    }
+  }
+
+  public function stockInByOrder(Request $request, $id) {
+    $company_id = $request->requestFrom->company_id;
+    $location_id = $request->input('location');
+
+    $location = StockLocation::of($company_id)->find($location_id)->get();
+    if (!$location)
+      return ResponseHelper::rejected([
+        'message' => 'FAILED_RECORD_NOT_FOUND',
+      ]);
+
+    $order = Order::of($company_id)->find($id)->get();
+    if (!$order)
+      return ResponseHelper::rejected([
+        'message' => 'FAILED_RECORD_NOT_FOUND',
+      ]);
+
+    try {
+      DB::beginTransaction();
+
+      foreach ($order->order_items as $item) {
+        $location->stockIn($request->requestFrom, $item->item_source->item_meta_id, $item->quantity, $item->id);
+      }
+
+      DB::commit();
+      return ResponseHelper::success();
+    }
+    catch (Exception $e) {
+      DB::rollBack();
+      return ResponseHelper::error([
+        'error_message' => $e->getMessage(),
       ]);
     }
   }
