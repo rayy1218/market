@@ -22,16 +22,12 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('', function () {
-  return 'OK';
+  return env('DB_HOST');
 });
 
 Route::prefix('/api')->middleware('authentication')->group(function () {
   Route::get('/healthcheck', function () {
     return 'OK';
-  });
-
-  Route::get('/healthcheck-db', function () {
-    return env('DB_HOST');
   });
 
   Route::prefix('/auth')->controller(AuthenticationController::class)->group(function () {
