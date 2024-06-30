@@ -30,6 +30,10 @@ Route::prefix('/api')->middleware('authentication')->group(function () {
     return 'OK';
   });
 
+  Route::get('/healthcheck-db', function () {
+    return env('DB_HOST');
+  });
+
   Route::prefix('/auth')->controller(AuthenticationController::class)->group(function () {
     Route::post('/register', 'register');
     Route::post('/login', 'login');
@@ -131,6 +135,7 @@ Route::prefix('/api')->middleware('authentication')->group(function () {
     Route::post('/stock-flow-log', 'stockFlowLog');
     Route::post('/stock-location-summary', 'stockLocationSummary');
     Route::post('/delivering-orders', 'deliveringOrders');
+    Route::post('/shift-summary', 'shiftSummary');
   });
 });
 

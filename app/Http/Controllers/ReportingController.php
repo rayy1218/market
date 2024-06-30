@@ -13,8 +13,10 @@ use App\Models\ShiftRecord;
 use App\Models\StockLocation;
 use App\Models\StockTransactionLog;
 use App\Models\Supplier;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Session;
 
 class ReportingController extends Controller
 {
@@ -133,9 +135,9 @@ class ReportingController extends Controller
       ->get();
 
     $income = $checkouts->map(function (Checkout $checkout) {
-      return $checkout->items->reduce(function (CheckoutItem $item) {
+      return $checkout->items->map(function (CheckoutItem $item) {
         return ($item->sale_data ? $item->sale_data->price : 0) * $item->quantity;
-      });
+      })->sum();
     })->sum();
 
     $cost = $orders->map(function (Order $order) {
@@ -144,10 +146,31 @@ class ReportingController extends Controller
       })->sum();
     })->sum();
 
+    $items = CheckoutItem::with(['checkout', 'sale_data', 'sale_data.item_meta'])
+      ->whereHas('checkout', function($query) use ($company_id) {
+        $query->where('company_id', $company_id);
+      })
+      ->whereBetween('created_at', [$startDate, $endDate])
+      ->get()->groupBy('sale_data.item_meta_id');
+
+    $result = array();
+    foreach ($items as $item_meta_id => $checkoutItems) {
+      $item = ItemMeta::find($item_meta_id);
+      $item->quantity = $checkoutItems->map(function ($item) {
+        return $item->quantity;
+      })->sum();
+      $item->capital = $checkoutItems->map(function ($item) {
+        return $item->quantity * $item->sale_data->price;
+      })->sum();
+
+      $result[] = $item;
+    }
+
     return ResponseHelper::success([
       'income' => $income,
       'cost' => $cost,
       'totalCheckout' => $checkouts->count(),
+      'items' => $result,
     ]);
   }
 
@@ -374,6 +397,46 @@ class ReportingController extends Controller
 
     return ResponseHelper::success([
       'data' => $orders,
+      'timezone' => Session::get('timezone'),
+    ]);
+  }
+
+  public function shiftSummary(Request $request) {
+    $company_id = $request->requestFrom->company_id;
+    $employee_id = $request->input('employee');
+    $date = $request->input('date');
+
+    if ($date) {
+      $startDate = Carbon::parse($date)->startOfDay();
+      $endDate = Carbon::parse($date)->endOfDay();
+    }
+    else {
+      $startDate = Carbon::now()->startOfDay();
+      $endDate = Carbon::now()->endOfDay();
+    }
+
+    $employee = User::where('company_id', $company_id)->find($employee_id);
+    $records = ShiftRecord::where('user_id', $employee->id)
+      ->whereBetween('created_at', [$startDate, $endDate])
+      ->get();
+
+    $total = 0;
+    $breaks = $records->whereIn('shift_record_type', ['start_break', 'end_break', 'end_shift']);
+    for ($i = 0; $i < $breaks->count(); $i += 1) {
+      if ($breaks[$i]->shift_record_type == 'start_break') {
+        if ($breaks[$i + 1]->shift_record_type == 'end_break' || $breaks[$i + 1]->shift_record_type == 'end_shift') {
+          $total += Carbon::parse($breaks[$i + 1]->created_at)->diffInMinutes(Carbon::parse($breaks[$i]->created_at));
+        }
+      }
+    }
+
+    if ($records->last()->shift_record_type == 'end_shift') {
+      $total = Carbon::parse($records->last()->created_at)->diffInMinutes(Carbon::parse($records->first()->created_at)) - $total;
+    }
+
+    return ResponseHelper::success([
+      'data' => $records,
+      'total' => $records->last()->shift_record_type == 'end_shift' ? -1 : $total,
     ]);
   }
 }
