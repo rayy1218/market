@@ -372,13 +372,13 @@ class SupplyChainController extends Controller
     $company_id = $request->requestFrom->company_id;
     $location_id = $request->input('location');
 
-    $location = StockLocation::of($company_id)->find($location_id)->get();
+    $location = StockLocation::of($company_id)->find($location_id);
     if (!$location)
       return ResponseHelper::rejected([
         'message' => 'FAILED_RECORD_NOT_FOUND',
       ]);
 
-    $order = Order::of($company_id)->find($id)->get();
+    $order = Order::of($company_id)->find($id);
     if (!$order)
       return ResponseHelper::rejected([
         'message' => 'FAILED_RECORD_NOT_FOUND',
