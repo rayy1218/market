@@ -48,7 +48,7 @@ class CheckoutController extends Controller
 
         $items[] = [
           'item' => $item,
-          'location' => $item->sale_data->default_stock_out_location_id,
+          'location' => $item->sale_data->default_stock_out_location_id ?? StockLocation::of($company_id)->first()->id,
           'quantity' => $quantity,
           'price' => $price,
         ];
@@ -84,11 +84,9 @@ class CheckoutController extends Controller
           $location->stockOut($request->requestFrom, $item['item']->id, $item['quantity'], $checkout_item->id);
         }
 
-        if ($customer) {
-          $customer->update([
-            'points' => $customer->points + floor($checkout->amount),
-          ]);
-        }
+        $customer?->update([
+          'points' => $customer->points + floor($checkout->amount),
+        ]);
 
 
         DB::commit();

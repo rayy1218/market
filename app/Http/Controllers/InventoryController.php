@@ -24,13 +24,20 @@ class InventoryController extends Controller
     $brand = $request->input('brand');
     $category = $request->input('category');
     $price = $request->input('price');
-    $stock_out_location = $request->input('stock_out_location');
+    $stock_out_location = $request->input('default_stock_out_location');
+    $receive_location = $request->input('default_receive_location');
 
     DB::beginTransaction();
 
     try {
       if ($stock_out_location)
         if (!StockLocation::of($company_id)->where('id', $stock_out_location)->first())
+          return ResponseHelper::rejected([
+            'message' => 'FAILED_RECORD_NOT_FOUND',
+          ]);
+
+      if ($receive_location)
+        if (!StockLocation::of($company_id)->where('id', $receive_location)->first())
           return ResponseHelper::rejected([
             'message' => 'FAILED_RECORD_NOT_FOUND',
           ]);
@@ -42,13 +49,14 @@ class InventoryController extends Controller
         'universal_product_code' => $upc,
         'brand' => $brand,
         'category' => $category,
+        'default_receive_location' => $receive_location ? StockLocation::of($company_id)->where('id', $receive_location)->first()->id : null,
       ]);
 
       ItemSaleData::create([
         'item_meta_id' => $itemMeta->id,
         'price' => $price ?? 0,
         'started_at' => Carbon::now(),
-        'default_stock_out_location_id' => $stock_out_location ?? StockLocation::of($company_id)->first()->id,
+        'default_stock_out_location_id' => $stock_out_location ? StockLocation::of($company_id)->where('id', $stock_out_location)->first()->id : null,
       ]);
 
       DB::commit();
