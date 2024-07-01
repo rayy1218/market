@@ -17,6 +17,7 @@ class ItemMeta extends Model
         'brand',
         'category',
         'others',
+        'default_receive_location'
     ];
 
     protected $casts = [
@@ -71,5 +72,9 @@ class ItemMeta extends Model
 
     public function supply_data() {
       return $this->hasOne(ItemSupplyData::class, 'item_meta_id', 'id');
+    }
+
+    public function default_receive_location() {
+      return $this->hasOne(StockLocation::class, 'id', 'default_receive_location');
     }
 }

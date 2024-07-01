@@ -370,13 +370,6 @@ class SupplyChainController extends Controller
 
   public function stockInByOrder(Request $request, $id) {
     $company_id = $request->requestFrom->company_id;
-    $location_id = $request->input('location');
-
-    $location = StockLocation::of($company_id)->find($location_id);
-    if (!$location)
-      return ResponseHelper::rejected([
-        'message' => 'FAILED_RECORD_NOT_FOUND',
-      ]);
 
     $order = Order::of($company_id)->find($id);
     if (!$order)
@@ -388,6 +381,7 @@ class SupplyChainController extends Controller
       DB::beginTransaction();
 
       foreach ($order->order_items as $item) {
+        $location = $item->item_source->item_meta->default_receive_location ?? StockLocation::of($company_id)->first();
         $location->stockIn($request->requestFrom, $item->item_source->item_meta_id, $item->quantity, $item->id);
       }
 
