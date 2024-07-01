@@ -84,9 +84,12 @@ class CheckoutController extends Controller
           $location->stockOut($request->requestFrom, $item['item']->id, $item['quantity'], $checkout_item->id);
         }
 
-        $customer->update([
-          'points' => $customer->points + floor($checkout->amount),
-        ]);
+        if ($customer) {
+          $customer->update([
+            'points' => $customer->points + floor($checkout->amount),
+          ]);
+        }
+
 
         DB::commit();
         return ResponseHelper::success();
