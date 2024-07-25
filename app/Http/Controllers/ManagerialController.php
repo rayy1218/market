@@ -289,6 +289,7 @@ class ManagerialController extends Controller
         'email' => $email,
         'username' => $username,
         'invite_token' => Str::random(32),
+        'password' => 'password',
         'status' => 'pending'
       ]);
 
